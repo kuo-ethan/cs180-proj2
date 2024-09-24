@@ -24,11 +24,8 @@ def save_image(image, filename):
             image_normalized = (image - np.min(image)) / (np.max(image) - np.min(image))
             image_uint8 = (image_normalized * 255).astype(np.uint8)
     elif len(image.shape) == 3:  # RGB image
-        image_uint8 = np.zeros_like(image, dtype=np.uint8)
-        for i in range(3):
-            channel = image[:, :, i]
-            channel_normalized = (channel - np.min(channel)) / (np.max(channel) - np.min(channel))
-            image_uint8[:, :, i] = (channel_normalized * 255).astype(np.uint8)
+        image_normalized = (image - np.min(image)) / (np.max(image) - np.min(image))
+        image_uint8 = (image_normalized * 255).astype(np.uint8)
     skio.imsave(f'../images/{filename}.jpg', image_uint8)
 
 # Apply a gaussian low pass filter over an image
@@ -116,6 +113,47 @@ def hybrid(im1, im2, cutoff_ksize, cutoff_sigma):
     high_freq_im1 = gray_im1 - gaussian_blur(gray_im1, cutoff_ksize, cutoff_sigma)
     low_freq_im2 = gaussian_blur(gray_im2, cutoff_ksize, cutoff_sigma)
     return np.clip(low_freq_im2 + high_freq_im1, 0, 1)
+
+# Return a blending of two same-dimension images down the vertical middle line
+def multi_resolution_blend(left_mask, right_mask, left_im, right_im, n=6):
+    # Create gaussian stacks
+    left_mask_gstack = [left_mask.astype(np.uint8)]
+    right_mask_gstack = [right_mask.astype(np.uint8)]
+    left_im_gstack = [left_im.astype(np.uint8)]
+    right_im_gstack = [right_im.astype(np.uint8)]
+
+    for _ in range(1, n):
+        left_mask_gstack.append(gaussian_blur(left_mask_gstack[-1], 30, 10).astype(np.float64))
+        right_mask_gstack.append(gaussian_blur(right_mask_gstack[-1], 30, 10).astype(np.float64))
+        left_im_gstack.append(gaussian_blur(left_im_gstack[-1], 5, 1).astype(np.float64))
+        right_im_gstack.append(gaussian_blur(right_im_gstack[-1], 5, 1).astype(np.float64))
+
+    # Construct laplacian images stacks
+    left_im_stack = []
+    right_im_stack = []
+    for i in range(n-1):
+        left_im_stack.append(left_im_gstack[i] - left_im_gstack[i+1])
+        right_im_stack.append(right_im_gstack[i] - right_im_gstack[i+1])
+    left_im_stack.append(left_im_gstack[-1])
+    right_im_stack.append(right_im_gstack[-1])
+
+    # For each level, generate blended image for that frequency band
+    out_im = np.zeros_like(left_im)
+    for i in range(n):
+        blended_im = left_mask_gstack[i] * left_im_stack[i] + right_mask_gstack[i] * right_im_stack[i]
+        out_im = out_im + blended_im
+    
+    # Save intermediate images
+    for i in range(n):
+        save_image(left_mask_gstack[i], f'left_mask_gstack[{i}]')
+        save_image(right_mask_gstack[i], f'right_mask_gstack[{i}]')
+        save_image(left_im_gstack[i], f'left_im_gstack[{i}]')
+        save_image(right_im_gstack[i], f'right_im_gstack[{i}]')
+        save_image(left_im_stack[i], f'left_im_stack[{i}]')
+        save_image(right_im_stack[i], f'right_im_stack[{i}]')
+
+    # Return final blended result
+    return out_im
 
 # ========== Starter code functions ============
 def get_points(im1, im2):
