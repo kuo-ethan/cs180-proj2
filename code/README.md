@@ -1,3 +1,1 @@
-Run python3 main.py
-
-You will need my image data though...?
+Run `python3 main.py` from `/code`
