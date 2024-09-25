@@ -54,6 +54,7 @@ def gradient_edge(image, threshold=DEFAULT_GRADIENT_THRESHOLD):
 
     # Gradient magnitude image
     gradient_magnitude = np.sqrt(x_derivative**2 + y_derivative**2)
+    save_image(gradient_magnitude, 'cameraman:blur-gradient')
 
     # Binarize the gradient magnitude image
     edge_image = gradient_magnitude >= threshold
@@ -74,6 +75,7 @@ def gradient_edge_fast(image, ksize=DEFAULT_GAUSSIAN_KSIZE, sigma=DEFAULT_GAUSSI
 
     # Gradient magnitude image
     gradient_magnitude = np.sqrt(x_gaussian_derivative**2 + y_gaussian_derivative**2)
+    save_image(gradient_magnitude, 'cameraman:dog')
 
     # Binarize the gradient magnitude image
     edge_image = gradient_magnitude >= threshold
@@ -111,11 +113,12 @@ def create_identity_filter(size):
 def hybrid(im1, im2, cutoff_ksize, cutoff_sigma):
     gray_im1, gray_im2 = color.rgb2gray(im1), color.rgb2gray(im2)
     high_freq_im1 = gray_im1 - gaussian_blur(gray_im1, cutoff_ksize, cutoff_sigma)
+    save_image(high_freq_im1, 'kobe_high_freq')
     low_freq_im2 = gaussian_blur(gray_im2, cutoff_ksize, cutoff_sigma)
     return np.clip(low_freq_im2 + high_freq_im1, 0, 1)
 
 # Return a blending of two same-dimension images down the vertical middle line
-def multi_resolution_blend(left_mask, right_mask, left_im, right_im, n=6):
+def multi_resolution_blend(name, left_mask, right_mask, left_im, right_im, n=6):
     # Create gaussian stacks
     left_mask_gstack = [left_mask.astype(np.uint8)]
     right_mask_gstack = [right_mask.astype(np.uint8)]
@@ -140,19 +143,25 @@ def multi_resolution_blend(left_mask, right_mask, left_im, right_im, n=6):
     # For each level, generate blended image for that frequency band
     out_im = np.zeros_like(left_im)
     for i in range(n):
-        blended_im = left_mask_gstack[i] * left_im_stack[i] + right_mask_gstack[i] * right_im_stack[i]
+        left_masked_im = left_mask_gstack[i] * left_im_stack[i]
+        right_masked_im = right_mask_gstack[i] * right_im_stack[i]
+        blended_im = left_masked_im + right_masked_im
+        save_image(left_masked_im, f'{name}_left_{i}')
+        save_image(right_masked_im, f'{name}_right_{i}')
+        save_image(blended_im, f'{name}_{i}')
         out_im = out_im + blended_im
     
     # Save intermediate images
     for i in range(n):
-        save_image(left_mask_gstack[i], f'left_mask_gstack[{i}]')
-        save_image(right_mask_gstack[i], f'right_mask_gstack[{i}]')
-        save_image(left_im_gstack[i], f'left_im_gstack[{i}]')
-        save_image(right_im_gstack[i], f'right_im_gstack[{i}]')
-        save_image(left_im_stack[i], f'left_im_stack[{i}]')
-        save_image(right_im_stack[i], f'right_im_stack[{i}]')
+        save_image(left_mask_gstack[i], f'{name}_left_mask_{i}')
+        save_image(right_mask_gstack[i], f'{name}_right_mask_{i}')
+        save_image(left_im_gstack[i], f'apple_im_gstack[{i}]')
+        save_image(right_im_gstack[i], f'orange_im_gstack[{i}]')
+        save_image(left_im_stack[i], f'apple_im_stack[{i}]')
+        save_image(right_im_stack[i], f'orange_im_stack[{i}]')
 
-    # Return final blended result
+    # Return and save final blended result
+    save_image(out_im, name)
     return out_im
 
 # ========== Starter code functions ============
